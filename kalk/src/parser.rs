@@ -699,7 +699,7 @@ fn parse_identifier(context: &mut Context) -> Result<Expr, KalkError> {
     {
         context.unit_decl_base_unit = Some(identifier.full_name);
         Ok(Expr::Var(Identifier::from_full_name(DECL_UNIT)))
-    } else if log_base.is_some()
+    } else if log_base.is_some() || crate::prelude::UNARY_FUNCS.contains_key(&identifier.full_name as &str)
         || context
             .symbol_table
             .get_mut()

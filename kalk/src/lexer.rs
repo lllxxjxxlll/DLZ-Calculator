@@ -353,6 +353,7 @@ impl<'a> Lexer<'a> {
                 && !(c.is_ascii_alphabetic()
                     || c == '\''
                     || c == '_'
+                    || c.is_ascii_digit()
                     || is_superscript(&c)
                     || is_subscript(&c))
             {
@@ -460,7 +461,7 @@ fn is_valid_identifier(c: Option<char>) -> bool {
             | '⌊' | '⌋' | '⌈' | '⌉' | '[' | ']' | '{' | '}' | 'π' | '√' | 'τ' | 'ϕ' | 'Γ' | '<'
             | '>' | '≠' | '≥' | '≤' | '×' | '÷' | '⋅' | '⟦' | '⟧' | '∧' | '∨' | '¬' | ':' | 'ᵀ'
             | '\n' => false,
-            _ => !c.is_ascii_digit() || is_superscript(&c) || is_subscript(&c),
+            _ => true,
         }
     } else {
         false

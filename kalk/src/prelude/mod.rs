@@ -78,6 +78,7 @@ lazy_static! {
         m.insert("ln", (UnaryFuncInfo(ln, Other), ""));
         m.insert("length", (UnaryFuncInfo(length, Other), ""));
         m.insert("log", (UnaryFuncInfo(log, Other), ""));
+        m.insert("log10", (UnaryFuncInfo(log10, Other), ""));
         m.insert("Re", (UnaryFuncInfo(re, Other), ""));
         m.insert("round", (UnaryFuncInfo(round, Other), ""));
         m.insert("sgn", (UnaryFuncInfo(sgn, Other), ""));
@@ -730,28 +731,16 @@ pub mod funcs {
     }
 
     pub fn log(x: KalkValue) -> Result<KalkValue, KalkError> {
-        let (real, _, unit) = as_number_or_return!(x.clone());
-        if x.has_imaginary() || real < 0f64 {
-            // ln(z) / ln(10)
-            ln(x)?.div_without_unit(&KalkValue::from(10f64.ln()))
-        } else {
-            Ok(KalkValue::Number(real.log10(), float!(0), unit))
-        }
+        ln(x)
+    }
+
+    pub fn log10(x: KalkValue) -> Result<KalkValue, KalkError> {
+        let log10_val = KalkValue::from(10f64.ln());
+        ln(x)?.div_without_unit(&log10_val)
     }
 
     pub fn logx(x: KalkValue, y: KalkValue) -> Result<KalkValue, KalkError> {
-        let (real, _, unit) = as_number_or_return!(x.clone());
-        let (real_rhs, _, _) = as_number_or_return!(y.clone());
-        if x.has_imaginary() || y.has_imaginary() || real < 0f64 || real_rhs < 0f64 {
-            // ln(z) / ln(n)
-            ln(x)?.div_without_unit(&ln(y)?)
-        } else {
-            Ok(KalkValue::Number(
-                real.log10() / real_rhs.log10(),
-                float!(0),
-                unit,
-            ))
-        }
+        ln(x)?.div_without_unit(&ln(y)?)
     }
 
     pub fn ln(x: KalkValue) -> Result<KalkValue, KalkError> {

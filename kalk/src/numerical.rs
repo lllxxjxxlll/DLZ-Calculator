@@ -11,6 +11,7 @@ use crate::kalk_value::KalkValue;
 use crate::lexer::TokenKind;
 use crate::prelude::abs;
 use crate::prelude::exp;
+use crate::prelude::sqrt;
 use crate::test_helpers::f64_to_float_literal;
 
 pub fn derive_func(
@@ -271,6 +272,80 @@ fn qthsh(
     Ok(result)
 }
 
+/// Try to solve a quadratic equation by evaluating f(0), f(1), f(-1)
+/// to detect coefficients a, b, c in ax²+bx+c=0, then use the quadratic formula.
+/// Returns the roots with exact float values.
+fn try_solve_quadratic(
+    context: &mut interpreter::Context,
+    fn_name: &str,
+) -> Result<Vec<KalkValue>, KalkError> {
+    let fn_id = Identifier::from_full_name(fn_name);
+    
+    // Evaluate f(0) = c
+    let f0 = interpreter::eval_fn_call_expr(
+        context, &fn_id,
+        &[ast::build_literal_ast(&KalkValue::from(0f64))], None,
+    )?.to_f64();
+    
+    // Evaluate f(1) = a + b + c
+    let f1 = interpreter::eval_fn_call_expr(
+        context, &fn_id,
+        &[ast::build_literal_ast(&KalkValue::from(1f64))], None,
+    )?.to_f64();
+    
+    // Evaluate f(-1) = a - b + c
+    let fm1 = interpreter::eval_fn_call_expr(
+        context, &fn_id,
+        &[ast::build_literal_ast(&KalkValue::from(-1f64))], None,
+    )?.to_f64();
+    
+    // Check if these values look like valid quadratic evaluations (not NaN/Inf)
+    if f0.is_nan() || f0.is_infinite() || f1.is_nan() || f1.is_infinite() || fm1.is_nan() || fm1.is_infinite() {
+        return Err(KalkError::Expected(String::from("not quadratic")));
+    }
+    
+    // Solve: a + b + c = f1, a - b + c = fm1, c = f0
+    let a = (f1 + fm1) / 2.0 - f0;
+    let b = (f1 - fm1) / 2.0;
+    let c = f0;
+    
+    // Verify by evaluating f(2) = 4a + 2b + c
+    let f2 = interpreter::eval_fn_call_expr(
+        context, &fn_id,
+        &[ast::build_literal_ast(&KalkValue::from(2f64))], None,
+    )?.to_f64();
+    
+    // If |a| < 1e-12 or the verification fails, it's not quadratic
+    if a.abs() < 1e-12 || (4.0 * a + 2.0 * b + c - f2).abs() > 0.0001 {
+        return Err(KalkError::Expected(String::from("not quadratic")));
+    }
+    
+    let discriminant = b * b - 4.0 * a * c;
+    
+    if discriminant < 0.0 {
+        // Complex roots
+        let real_part = -b / (2.0 * a);
+        let imag_part = (-discriminant).sqrt() / (2.0 * a);
+        Ok(vec![
+            KalkValue::Number(float!(real_part), float!(imag_part), None),
+            KalkValue::Number(float!(real_part), float!(-imag_part), None),
+        ])
+    } else if discriminant.abs() < 1e-12 {
+        // Double root
+        let root = -b / (2.0 * a);
+        Ok(vec![KalkValue::Number(float!(root), float!(0f64), None)])
+    } else {
+        // Two distinct real roots
+        let sqrt_disc = discriminant.sqrt();
+        let root1 = (-b + sqrt_disc) / (2.0 * a);
+        let root2 = (-b - sqrt_disc) / (2.0 * a);
+        Ok(vec![
+            KalkValue::Number(float!(root1), float!(0f64), None),
+            KalkValue::Number(float!(root2), float!(0f64), None),
+        ])
+    }
+}
+
 pub fn find_root(
     context: &mut interpreter::Context,
     expr: &Expr,
@@ -283,32 +358,74 @@ pub fn find_root(
         Box::new(expr.clone()),
     );
     context.symbol_table.set(f);
-    let mut approx = KalkValue::from(1f64);
-    for _ in 0..100 {
-        let (new_approx, done) =
-            newton_method(context, approx, &Identifier::from_full_name(FN_NAME))?;
-        approx = new_approx;
-        if done {
-            break;
+
+    // Attempt to detect and solve quadratic equations ax^2 + bx + c = 0 analytically
+    if let Ok(quadratic_roots) = try_solve_quadratic(context, FN_NAME) {
+        context.is_approximation = false; // Exact roots from quadratic formula
+        context.symbol_table.get_and_remove_var(var_name);
+        if quadratic_roots.len() == 1 {
+            return Ok(quadratic_roots[0].clone());
+        } else {
+            return Ok(KalkValue::Vector(quadratic_roots));
         }
     }
 
-    // Confirm that the approximation is correct
-    let (test_real, test_imaginary) = interpreter::eval_fn_call_expr(
-        context,
-        &Identifier::from_full_name(FN_NAME),
-        &[crate::ast::build_literal_ast(&approx)],
-        None,
-    )?
-    .values();
+    let initial_guesses = [-10.0, -5.0, -2.0, -1.0, 0.0, 1.0, 2.0, 5.0, 10.0];
+    let mut roots: Vec<KalkValue> = Vec::new();
+    let mut found_root_values: Vec<f64> = Vec::new();
+
+    for &initial in &initial_guesses {
+        let mut approx = KalkValue::from(initial);
+        for _ in 0..100 {
+            let (new_approx, done) =
+                newton_method(context, approx, &Identifier::from_full_name(FN_NAME))?;
+            approx = new_approx;
+            if done {
+                break;
+            }
+        }
+
+        let (approx_real, _approx_imag) = approx.clone().values();
+
+        let (test_real, test_imaginary) = interpreter::eval_fn_call_expr(
+            context,
+            &Identifier::from_full_name(FN_NAME),
+            &[crate::ast::build_literal_ast(&approx)],
+            None,
+        )?
+        .values();
+
+        if test_real.is_nan() || test_real.abs() > 0.0001f64 || test_imaginary.abs() > 0.0001f64 {
+            continue;
+        }
+
+        let is_duplicate = found_root_values
+            .iter()
+            .any(|&r| (r - approx_real).abs() < 0.01);
+
+        if !is_duplicate {
+            found_root_values.push(approx_real);
+            roots.push(approx);
+        }
+    }
 
     context.symbol_table.get_and_remove_var(var_name);
 
-    if test_real.is_nan() || test_real.abs() > 0.0001f64 || test_imaginary.abs() > 0.0001f64 {
+    if roots.is_empty() {
         return Err(KalkError::UnableToSolveEquation(String::from("Root not found")));
     }
 
-    Ok(approx)
+    roots.sort_by(|a, b| {
+        let (a_real, _) = a.clone().values();
+        let (b_real, _) = b.clone().values();
+        a_real.partial_cmp(&b_real).unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    if roots.len() == 1 {
+        Ok(roots[0].clone())
+    } else {
+        Ok(KalkValue::Vector(roots))
+    }
 }
 
 fn newton_method(
@@ -323,7 +440,6 @@ fn newton_method(
         None,
     )?;
 
-    // If it ends up solving the equation early, abort
     const PRECISION: f64 = 0.0000001f64;
     match f {
         KalkValue::Number(x, y, _)
@@ -336,6 +452,11 @@ fn newton_method(
 
     let f_prime_name = Identifier::from_name_and_primes(&fn_name.pure_name, 1);
     let f_prime = derive_func(context, &f_prime_name, initial.clone())?;
+
+    let (f_prime_real, f_prime_imag) = f_prime.clone().values();
+    if f_prime_real.abs() < 1e-10 && f_prime_imag.abs() < 1e-10 {
+        return Ok((initial, false));
+    }
 
     Ok((
         initial.sub_without_unit(&f.div_without_unit(&f_prime)?)?,

@@ -12,7 +12,7 @@ pub fn eval(
     no_leading_equal: bool,
     raw: bool
 ) {
-    match parser::eval(parser, input, precision) {
+    match parser::eval(parser, input) {
         Ok(Some(mut result)) => {
             if base != 10 && !result.set_radix(base) {
                 print_err("Invalid base. Change it by typing eg. `base 10`.");

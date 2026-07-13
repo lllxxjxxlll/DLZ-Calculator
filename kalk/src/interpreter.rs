@@ -22,7 +22,7 @@ pub struct Context<'a> {
     timeout: Option<u128>,
     #[cfg(not(target_arch = "wasm32"))]
     start_time: std::time::SystemTime,
-    is_approximation: bool,
+    pub(crate) is_approximation: bool,
     recursion_depth: u32,
     max_recursion_depth: u32,
     equation_variable: Option<String>,
@@ -72,11 +72,11 @@ impl<'a> Context<'a> {
             let num = eval_stmt(self, stmt)?;
 
             // Insert the last value into the `ans` variable.
-            self.symbol_table.set(if num.has_unit() {
+            self.symbol_table.set(if let Some(unit) = num.get_unit() {
                 Stmt::VarDecl(
                     Identifier::from_full_name("ans"),
                     Box::new(Expr::Unit(
-                        num.get_unit().unwrap().to_string(),
+                        unit.to_string(),
                         Box::new(crate::ast::build_literal_ast(&num)),
                     )),
                 )
@@ -618,24 +618,18 @@ fn eval_loop(
     expression: &Expr,
     unit: Option<String>,
 ) -> Result<KalkValue, KalkError> {
-    if context.sum_variables.is_none() {
-        context.sum_variables = Some(Vec::new());
-    }
-
-    {
-        let sum_variables = context.sum_variables.as_mut().unwrap();
-        sum_variables.push(SumVar {
-            name: var_name.into(),
-            value: 0,
-        });
-    }
+    let sum_variables = context.sum_variables.get_or_insert_with(Vec::new);
+    sum_variables.push(SumVar {
+        name: var_name.into(),
+        value: 0,
+    });
 
     let start = eval_expr(context, start_expr, None)?.to_f64() as i128;
     let end = eval_expr(context, end_expr, None)?.to_f64() as i128;
     let sum_else_prod = match identifier.full_name.as_ref() {
         "sum" => true,
         "prod" => false,
-        _ => unreachable!(),
+        _ => return Err(KalkError::UndefinedFn(identifier.full_name.clone())),
     };
     let mut sum = if sum_else_prod {
         KalkValue::from(0f64)
@@ -644,8 +638,19 @@ fn eval_loop(
     };
 
     for n in start..=end {
-        let sum_variables = context.sum_variables.as_mut().unwrap();
-        sum_variables.last_mut().unwrap().value = n;
+        if let Some(sum_vars) = context.sum_variables.as_mut() {
+            if let Some(last_var) = sum_vars.last_mut() {
+                last_var.value = n;
+            } else {
+                return Err(KalkError::EvaluationError(
+                    "Internal error: sum variables stack is empty".to_string(),
+                ));
+            }
+        } else {
+            return Err(KalkError::EvaluationError(
+                "Internal error: sum variables not initialized".to_string(),
+            ));
+        }
 
         let eval = eval_expr(context, expression, None)?;
         if sum_else_prod {
@@ -655,8 +660,9 @@ fn eval_loop(
         }
     }
 
-    let sum_variables = context.sum_variables.as_mut().unwrap();
-    sum_variables.pop();
+    if let Some(sum_vars) = context.sum_variables.as_mut() {
+        sum_vars.pop();
+    }
 
     let (sum_real, sum_imaginary, _) = as_number_or_zero!(sum);
 
@@ -789,12 +795,20 @@ fn eval_comprehension(
     conditions: &[Expr],
     vars: &[RangedVar],
 ) -> Result<Vec<KalkValue>, KalkError> {
+    if vars.is_empty() || conditions.is_empty() {
+        return Err(KalkError::InvalidComprehension(String::from("Empty comprehension conditions or variables.")));
+    }
+
     if vars.len() != conditions.len() {
         return Err(KalkError::InvalidComprehension(String::from("Expected a new variable to be introduced for every condition (conditions are comma separated).")));
     }
 
-    let condition = conditions.first().unwrap();
-    let var = vars.first().unwrap();
+    let condition = conditions.first().ok_or_else(|| {
+        KalkError::InvalidComprehension(String::from("Missing condition in comprehension."))
+    })?;
+    let var = vars.first().ok_or_else(|| {
+        KalkError::InvalidComprehension(String::from("Missing variable in comprehension."))
+    })?;
     context.symbol_table.insert(Stmt::VarDecl(
         Identifier::from_full_name(&var.name),
         Box::new(Expr::Literal(float!(0f64))),
@@ -811,14 +825,16 @@ fn eval_comprehension(
         ));
 
         if conditions.len() > 1 {
-            let x = eval_comprehension(context, left, &conditions[1..], &vars[1..]);
-            if let Err(err) = x {
-                context.symbol_table.get_and_remove_var(&var.name);
-                return Err(err);
-            }
-
-            for value in x.unwrap() {
-                values.push(Ok(value));
+            match eval_comprehension(context, left, &conditions[1..], &vars[1..]) {
+                Ok(nested_values) => {
+                    for value in nested_values {
+                        values.push(Ok(value));
+                    }
+                }
+                Err(err) => {
+                    context.symbol_table.get_and_remove_var(&var.name);
+                    return Err(err);
+                }
             }
         }
 

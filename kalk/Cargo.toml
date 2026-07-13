@@ -25,7 +25,8 @@ test-case = "1.0.0"
 regex = "1"
 
 [features]
-default = ["rug", "gmp-mpfr-sys"]
+default = []
+rug = ["dep:rug", "gmp-mpfr-sys"]
 # Link against system GMP/MPFR instead of building them from source.
 # Speeds up compilation but complicates releases, disabled by default
 use-system-libs = ["gmp-mpfr-sys/use-system-libs"]

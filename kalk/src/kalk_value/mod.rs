@@ -903,7 +903,7 @@ impl KalkValue {
                 calculate_matrix(lhs.clone(), rhs, &KalkValue::mul_without_unit)
             }
             (KalkValue::Matrix(rows), KalkValue::Vector(values_rhs)) => {
-                if rows.first().unwrap().len() != values_rhs.len() {
+                if rows.is_empty() || rows.first().map_or(true, |row| row.len() != values_rhs.len()) {
                     return Err(KalkError::IncompatibleVectorsMatrixes);
                 }
 
@@ -922,12 +922,16 @@ impl KalkValue {
                 Ok(KalkValue::Vector(new_values))
             }
             (KalkValue::Matrix(rows), KalkValue::Matrix(rows_rhs)) => {
-                let lhs_columns = rows.first().unwrap();
+                let lhs_columns = rows.first().ok_or_else(|| {
+                    KalkError::IncompatibleVectorsMatrixes
+                })?;
                 if lhs_columns.len() != rows_rhs.len() {
                     return Err(KalkError::IncompatibleVectorsMatrixes);
                 }
 
-                let rhs_columns = rows_rhs.first().unwrap();
+                let rhs_columns = rows_rhs.first().ok_or_else(|| {
+                    KalkError::IncompatibleVectorsMatrixes
+                })?;
                 let mut result = vec![vec![KalkValue::from(0f64); rhs_columns.len()]; rows.len()];
 
                 // For every row in lhs
@@ -980,12 +984,9 @@ impl KalkValue {
     pub(crate) fn div_without_unit(self, rhs: &KalkValue) -> Result<KalkValue, KalkError> {
         match (self.clone(), rhs.clone()) {
             (KalkValue::Number(real, _, _), KalkValue::Number(real_rhs, _, unit)) => {
-                // Avoid unecessary calculations
                 if !self.has_imaginary() && !rhs.has_imaginary() {
                     Ok(KalkValue::Number(real / real_rhs, float!(0f64), unit))
                 } else {
-                    // Multiply both the numerator and denominator
-                    // with the conjugate of the denominator, and divide.
                     let conjugate = rhs.get_conjugate()?;
                     let (numerator, numerator_imaginary) =
                         self.mul_without_unit(&conjugate)?.values();
@@ -1053,7 +1054,7 @@ impl KalkValue {
                     return Err(KalkError::ExpectedReal);
                 }
 
-                if rows.len() != rows.first().unwrap().len() {
+                if rows.is_empty() || rows.len() != rows.first().map_or(0, |row| row.len()) {
                     return Err(KalkError::Expected(String::from("a square matrix")));
                 }
 
@@ -1326,10 +1327,11 @@ fn calculate_matrix(
         (KalkValue::Matrix(rows), KalkValue::Number(_, _, _)) => {
             let mut new_rows = Vec::new();
             for row in rows {
-                new_rows.push(Vec::new());
+                let mut new_row = Vec::new();
                 for item in row {
-                    new_rows.last_mut().unwrap().push(action(item.clone(), y)?);
+                    new_row.push(action(item.clone(), y)?);
                 }
+                new_rows.push(new_row);
             }
 
             Ok(KalkValue::Matrix(new_rows))
@@ -1341,33 +1343,38 @@ fn calculate_matrix(
 
             let mut new_rows = Vec::new();
             for (i, row) in rows.iter().enumerate() {
-                new_rows.push(Vec::new());
+                let mut new_row = Vec::new();
                 for value in row {
-                    new_rows
-                        .last_mut()
-                        .unwrap()
-                        .push(action(value.clone(), &values_rhs[i])?)
+                    new_row.push(action(value.clone(), &values_rhs[i])?)
                 }
+                new_rows.push(new_row);
             }
 
             Ok(KalkValue::Matrix(new_rows))
         }
         (KalkValue::Matrix(rows), KalkValue::Matrix(rows_rhs)) => {
-            if rows.len() != rows_rhs.len()
-                || rows.first().unwrap().len() != rows_rhs.first().unwrap().len()
+            if rows.is_empty() || rows_rhs.is_empty()
+                || rows.len() != rows_rhs.len()
+                || rows.first().map_or(0, |row| row.len()) != rows_rhs.first().map_or(0, |row| row.len())
             {
                 return Err(KalkError::IncompatibleVectorsMatrixes);
             }
 
             let mut new_rows = Vec::new();
             for (i, row) in rows.iter().enumerate() {
-                new_rows.push(Vec::new());
+                let mut new_row = Vec::new();
                 for (j, value) in row.iter().enumerate() {
-                    new_rows
-                        .last_mut()
-                        .unwrap()
-                        .push(action(value.clone(), &rows_rhs[i][j])?)
+                    if let Some(rhs_row) = rows_rhs.get(i) {
+                        if let Some(rhs_value) = rhs_row.get(j) {
+                            new_row.push(action(value.clone(), rhs_value)?);
+                        } else {
+                            return Err(KalkError::IncompatibleVectorsMatrixes);
+                        }
+                    } else {
+                        return Err(KalkError::IncompatibleVectorsMatrixes);
+                    }
                 }
+                new_rows.push(new_row);
             }
 
             Ok(KalkValue::Matrix(new_rows))
@@ -1432,14 +1439,29 @@ fn calculate_unit(
     if let (KalkValue::Number(_, _, unit_left), KalkValue::Number(real_right, imaginary_right, _)) =
         (left, &right)
     {
-        if left.has_unit() && right.has_unit() {
-            right.convert_to_unit(context, unit_left.as_ref().unwrap())
-        } else {
-            Some(KalkValue::Number(
+        match (left.has_unit(), right.has_unit()) {
+            (true, true) => {
+                if let Some(unit) = unit_left.as_ref() {
+                    right.convert_to_unit(context, unit)
+                } else {
+                    Some(right)
+                }
+            }
+            (true, false) => Some(KalkValue::Number(
                 real_right.clone(),
                 imaginary_right.clone(),
                 unit_left.clone(),
-            ))
+            )),
+            (false, true) => Some(KalkValue::Number(
+                real_right.clone(),
+                imaginary_right.clone(),
+                right.get_unit().cloned(),
+            )),
+            (false, false) => Some(KalkValue::Number(
+                real_right.clone(),
+                imaginary_right.clone(),
+                None,
+            )),
         }
     } else {
         None

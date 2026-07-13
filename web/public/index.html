@@ -1,79 +1,250 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html lang="zh-CN">
 <head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DLZ Calculator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-	<title>Svelte app</title>
+        body {
+            font-family: 'Consolas', 'Monaco', monospace;
+            background: linear-gradient(135deg, rgb(127, 171, 193) 0%, #4d5e8b 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
 
-	<link rel="icon" type="image/png" href="/favicon.png">
-	<script defer src="/build/bundle.js"></script>
+        .calculator {
+            width: 100%;
+            max-width: 700px;
+            background: #1e1e1e;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
 
-	<style>
-		#wrapper {
-			padding: 40px;
-			background-color: #212121;
-		}
+        .header {
+            background: #273846;
+            padding: 14px 24px;
+            border-bottom: 1px solid #3d3d3d;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
-		html,
-		body {
-			overflow-x: hidden;
-		}
+        .header h1 {
+            color: #fff;
+            font-size: 20px;
+            font-weight: 600;
+        }
 
-		.hint {
-			color: #9c9c9c;
-		}
+        .console {
+            padding: 20px 24px;
+            max-height: 600px;
+            overflow-y: auto;
+            background: #1e1e1e;
+        }
 
-		.calculator {
-			width: 850px;
-			height: 350px;
-			color: white;
-			font-family: "Hack", monospace, Consolas;
-			font-size: 14px;
-			padding: 5px 10px 0 10px;
-			background-color: #2e2e2e;
-			border-radius: 7px;
-			box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.4) inset;
-		}
+        .console::-webkit-scrollbar {
+            width: 6px;
+        }
 
-		@media screen and (max-width: 850px) {
-			body {
-				width: 100%;
-				height: 100%;
-				margin: 0;
-				padding: 0;
-				padding-top: 300px;
-				padding-bottom: 300px;
-			}
+        .console::-webkit-scrollbar-track {
+            background: #2d2d2d;
+        }
 
-			#wrapper {
-				padding: 0;
-			}
+        .console::-webkit-scrollbar-thumb {
+            background: #4d4d4d;
+            border-radius: 3px;
+        }
 
-			.calculator {
-				width: 100vw;
-				height: 100vh;
-				box-sizing: border-box;
-				border-radius: 0;
-				box-shadow: 0;
-				padding: 0;
-			}
-		}
-	</style>
+        .console-line {
+            margin-bottom: 10px;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        .console-line.prompt {
+            color: #61afef;
+        }
+
+        .console-line.result {
+            color: #98c379;
+            margin-left: 26px;
+        }
+
+        .console-line.error {
+            color: #e06c75;
+            margin-left: 26px;
+        }
+
+        .console-line.hint-text {
+            color: #6b6b6b;
+            font-style: italic;
+        }
+
+        .input-area {
+            background: #273846;
+            padding: 14px 24px;
+            border-top: 1px solid #3d3d3d;
+            display: flex;
+            gap: 14px;
+        }
+
+        .input-area span {
+            color: #61afef;
+            font-size: 20px;
+            line-height: 40px;
+        }
+
+        #input {
+            flex: 1;
+            background: #1e1e1e;
+            border: 1px solid #3d3d3d;
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: #fff;
+            font-family: inherit;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        #input:focus {
+            border-color: #61afef;
+        }
+
+        #input::placeholder {
+            color: #6b6b6b;
+        }
+
+        #calculate-btn {
+            background: #61afef;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: #1e1e1e;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        #calculate-btn:hover {
+            background: #7bc1f5;
+        }
+
+        #calculate-btn:disabled {
+            background: #4d7a9e;
+            cursor: not-allowed;
+        }
+
+        @media (max-width: 600px) {
+            .calculator {
+                border-radius: 0;
+            }
+
+            .input-area {
+                flex-direction: column;
+            }
+
+            #calculate-btn {
+                padding: 10px;
+            }
+        }
+    </style>
 </head>
-
 <body>
-	<section id="wrapper">
-		<div class="calculator">
-			<kalk-calculator hinttext="test" autofocus="true" buttonpanel="true" numberrow="true">
-				<console-line>kalk</console-line>
-				<console-line>
-					<span class="hint">Type 'help' for instructions.</span>
-				</console-line>
-			</kalk-calculator>
-		</div>
-	</section>
-</body>
+    <div class="calculator">
+        <div class="header">
+            <h1>DLZ Calculator</h1>
+        </div>
+        
+        <div class="console" id="console">
+            <div class="console-line prompt">DLZ</div>
+            <div class="console-line hint-text">Examples:</div>
+            <div class="console-line hint-text">2+3*4, sin(pi), (x^2-4=0), f(x)=x^2; f'(2)</div>
+        </div>
 
+        <div class="input-area">
+            <span>&gt;</span>
+            <input type="text" id="input" placeholder="Enter expression..." autocomplete="off">
+            <button id="calculate-btn">Calculate</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import init, { Context } from './kalk/kalk.js?v=20260713';
+
+        let context = null;
+        const consoleEl = document.getElementById('console');
+        const inputEl = document.getElementById('input');
+        const btnEl = document.getElementById('calculate-btn');
+
+        async function initKalk() {
+            try {
+                await init();
+                context = new Context();
+                btnEl.disabled = false;
+                inputEl.disabled = false;
+                inputEl.focus();
+                addOutput('Ready!', 'hint-text');
+            } catch (error) {
+                addOutput('Error loading calculator: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+
+        function addOutput(text, className = '') {
+            const line = document.createElement('div');
+            line.className = 'console-line ' + className;
+            line.textContent = text;
+            consoleEl.appendChild(line);
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        async function evaluate() {
+            const expression = inputEl.value.trim();
+            if (!expression) return;
+
+            inputEl.value = '';
+            addOutput('> ' + expression, 'prompt');
+
+            if (!context) {
+                addOutput('Calculator not ready yet.', 'error');
+                return;
+            }
+
+            try {
+                const result = context.evaluate(expression);
+                if (result) {
+                    const resultStr = result.toPrettyString();
+                    addOutput('= ' + resultStr, 'result');
+                    result.free();
+                } else {
+                    addOutput('No result', 'error');
+                }
+            } catch (error) {
+                addOutput('Error: ' + error.message, 'error');
+            }
+        }
+
+        inputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                evaluate();
+            }
+        });
+
+        btnEl.addEventListener('click', evaluate);
+
+        initKalk();
+    </script>
+</body>
 </html>

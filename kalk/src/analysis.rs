@@ -237,7 +237,7 @@ fn analyse_expr(context: &mut Context, expr: Expr) -> Result<Expr, KalkError> {
             }
 
             if analysed_values.len() == 1 && matches!(analysed_values[0], Expr::Comprehension(_, _, _)) {
-                analysed_values.pop().unwrap()
+                analysed_values.pop().expect("analysed_values should have exactly one element")
             } else if is_equation_or_binary_equation(&analysed_values) {
                 let mut equations = Vec::new();
                 let mut variables = Vec::new();
@@ -271,7 +271,11 @@ fn analyse_expr(context: &mut Context, expr: Expr) -> Result<Expr, KalkError> {
                     variables.push(Identifier::from_full_name(&var_name));
                 }
                 
-                Expr::EquationSystem(equations, variables)
+                if equations.len() == 1 && variables.len() == 1 {
+                    Expr::Equation(equations[0].0.clone(), equations[0].1.clone(), variables[0].clone())
+                } else {
+                    Expr::EquationSystem(equations, variables)
+                }
             } else {
                 Expr::Vector(analysed_values)
             }
@@ -382,7 +386,9 @@ fn analyse_binary(
 
             context.in_equation = false;
 
-            let var_name = context.equation_variable.as_ref().unwrap();
+            let var_name = context.equation_variable.as_ref().ok_or_else(|| {
+                KalkError::EvaluationError(String::from("Equation variable not set during equation analysis."))
+            })?;
             let identifier = Identifier::from_full_name(var_name);
             context.equation_variable = None;
 
@@ -424,24 +430,30 @@ fn analyse_binary(
 
             let mut conditions = vec![right];
             let mut has_comma = false;
-            while let Expr::Binary(_, TokenKind::Comma, _) = conditions.last().unwrap() {
+            while let Some(Expr::Binary(_, TokenKind::Comma, _)) = conditions.last() {
                 has_comma = true;
-                if let Expr::Binary(left_condition, _, right_condition) = conditions.pop().unwrap()
+                if let Some(Expr::Binary(left_condition, _, right_condition)) = conditions.pop()
                 {
                     conditions.push(analyse_expr(context, *left_condition.to_owned())?);
                     conditions.push(analyse_expr(context, *right_condition.to_owned())?);
+                } else {
+                    break;
                 }
             }
 
             if !has_comma {
-                let analysed_condition = analyse_expr(context, conditions.pop().unwrap())?;
-                conditions.push(analysed_condition);
+                if let Some(condition) = conditions.pop() {
+                    let analysed_condition = analyse_expr(context, condition)?;
+                    conditions.push(analysed_condition);
+                }
             }
 
             context.in_comprehension = false;
             context.in_conditional = false;
             let left = analyse_expr(context, left)?;
-            let mut all_vars = context.comprehension_vars.take().unwrap();
+            let mut all_vars = context.comprehension_vars.take().ok_or_else(|| {
+                KalkError::EvaluationError(String::from("Comprehension variables not initialized."))
+            })?;
             let vars = all_vars.drain(comprehension_vars_index..).collect();
             context.comprehension_vars = Some(all_vars);
 
@@ -506,10 +518,12 @@ fn analyse_comparison_with_var(
     let var_name = if let Expr::Var(identifier) = &analysed_var {
         &identifier.pure_name
     } else {
-        unreachable!("Expected Expr::Var");
+        return Err(KalkError::EvaluationError(String::from("Expected variable in comprehension range.")));
     };
 
-    let vars = context.comprehension_vars.as_mut().unwrap();
+    let vars = context.comprehension_vars.as_mut().ok_or_else(|| {
+        KalkError::EvaluationError(String::from("Comprehension variables not initialized."))
+    })?;
     for ranged_var in vars {
         if &ranged_var.name == var_name {
             match op {
@@ -568,7 +582,11 @@ fn analyse_var(
             return Ok(Expr::FnCall(identifier, args));
         }
 
-        return Ok(Expr::FnCall(identifier, vec![adjacent_factor.unwrap()]));
+        if let Some(factor) = adjacent_factor {
+            return Ok(Expr::FnCall(identifier, vec![factor]));
+        }
+
+        return Ok(Expr::FnCall(identifier, vec![]));
     }
 
     let is_comprehension_var = if let Some(vars) = &context.comprehension_vars {
@@ -581,13 +599,9 @@ fn analyse_var(
         with_adjacent(Expr::Var(identifier), adjacent_factor, adjacent_exponent)
     } else if context.symbol_table.contains_var(&identifier.pure_name)
         || (identifier.pure_name.len() == 1 && !context.in_equation)
-        || context.current_function_parameters.is_some()
-            && context
-                .current_function_parameters
-                .as_ref()
-                .unwrap()
-                .iter()
-                .any(|param| param[2..] == identifier.pure_name)
+        || context.current_function_parameters.as_ref().map_or(false, |params| {
+            params.iter().any(|param| param[2..] == identifier.pure_name)
+        })
     {
         with_adjacent(
             build_var(context, &identifier.full_name),
@@ -694,7 +708,9 @@ fn parse_float_from_str(s: &str) -> f64 {
 }
 
 fn build_indexed_var(context: &mut Context, identifier: Identifier) -> Result<Expr, KalkError> {
-    let underscore_pos = identifier.pure_name.find('_').unwrap();
+    let underscore_pos = identifier.pure_name.find('_').ok_or_else(|| {
+        KalkError::EvaluationError(format!("Invalid indexed variable '{}': missing underscore.", identifier.pure_name))
+    })?;
     let var_name = &identifier.pure_name[0..underscore_pos];
     let lowered = &identifier.pure_name[underscore_pos + 1..];
     let lowered_expr =
@@ -767,7 +783,10 @@ fn build_split_up_vars(
 
     // Turn each individual character into its own variable reference.
     // This parses eg `xy` as `x*y` instead of *one* variable.
-    let mut left = build_var(context, &chars.first().unwrap().to_string());
+    let first_char = chars.first().ok_or_else(|| {
+        KalkError::EvaluationError(String::from("Empty identifier encountered."))
+    })?;
+    let mut left = build_var(context, &first_char.to_string());
     let mut chars_iter = chars.iter().skip(1).peekable();
     let mut adjacent_exponent = adjacent_exponent;
     while let Some(c) = chars_iter.next() {
@@ -856,15 +875,16 @@ fn analyse_fn(
     for (i, argument) in arguments.iter().enumerate() {
         if i == 0 && context.in_sum_prod {
             context.in_conditional = true;
-            let vars = context.sum_variable_names.as_mut().unwrap();
-            if let Expr::Binary(left, TokenKind::Equals, _) = argument {
-                if let Expr::Var(var_identifier) = &**left {
-                    vars.push(var_identifier.pure_name.clone());
+            if let Some(vars) = context.sum_variable_names.as_mut() {
+                if let Expr::Binary(left, TokenKind::Equals, _) = argument {
+                    if let Expr::Var(var_identifier) = &**left {
+                        vars.push(var_identifier.pure_name.clone());
+                    } else {
+                        vars.push(String::from("n"));
+                    }
                 } else {
                     vars.push(String::from("n"));
                 }
-            } else {
-                vars.push(String::from("n"));
             }
         }
 
@@ -876,8 +896,9 @@ fn analyse_fn(
 
     if is_sum_prod {
         context.in_sum_prod = prev_in_sum_prod;
-        let vars = context.sum_variable_names.as_mut().unwrap();
-        vars.pop();
+        if let Some(vars) = context.sum_variable_names.as_mut() {
+            vars.pop();
+        }
     }
 
     Ok(Expr::FnCall(identifier, analysed_arguments))

@@ -126,7 +126,7 @@ pub(crate) fn get_input_file_by_name(name: &str) -> Option<String> {
     }
 }
 
-pub fn load_input_file(file_name: &str, precision: u32, parser_context: &mut parser::Context) {
+pub fn load_input_file(file_name: &str, _precision: u32, parser_context: &mut parser::Context) {
     let mut file_content = String::new();
     File::open(file_name)
         .expect("Couldn't find file.")
@@ -135,7 +135,7 @@ pub fn load_input_file(file_name: &str, precision: u32, parser_context: &mut par
 
     // Parse the input file content, resulting in the symbol table being filled out.
     // Output is not needed here.
-    if let Err(error) = parser::eval(parser_context, &file_content, precision) {
+    if let Err(error) = parser::eval(parser_context, &file_content) {
         eprintln!("{}", error);
     }
 }

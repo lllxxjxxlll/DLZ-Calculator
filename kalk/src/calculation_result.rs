@@ -50,6 +50,52 @@ pub struct CalculationResult {
 
     #[wasm_bindgen(js_name = toPrettyStringWithFormat)]
     pub fn to_string_pretty_format(&self, format: ScientificNotationFormat) -> String {
+        let equation_variable = if let Some(name) = &self.equation_variable {
+            format!("{} ", name)
+        } else {
+            String::new()
+        };
+
+        let vars_display = if self.equation_variables.len() > 1 {
+            let sorted_vars = {
+                let mut v = self.equation_variables.clone();
+                v.sort();
+                v
+            };
+            format!("({}) ", sorted_vars.join(", "))
+        } else {
+            String::new()
+        };
+
+        if let KalkValue::Vector(values) = &self.value {
+            let mut lines = Vec::new();
+            for val in values {
+                let value_str = if self.radix == 10 {
+                    val.to_string_pretty_radix(10, format)
+                } else {
+                    format!(
+                        "{}\n{}",
+                        val.to_string_pretty_radix(10, format),
+                        val.to_string_pretty_radix(self.radix, format),
+                    )
+                };
+
+                let decimal_count = if let Some(dot_index) = value_str.chars().position(|c| c == '.') {
+                    let end_index = value_str.chars().position(|c| c == ' ' || c == 'i').unwrap_or(value_str.len()) - 1;
+                    end_index.saturating_sub(dot_index)
+                } else {
+                    0
+                };
+
+                if (self.is_approximation && decimal_count > 0) || decimal_count == 10 {
+                    lines.push(format!("{}{}≈ {}", vars_display, equation_variable, value_str));
+                } else {
+                    lines.push(format!("{}{}= {}", vars_display, equation_variable, value_str));
+                }
+            }
+            return lines.join("\n");
+        }
+
         let value = if self.radix == 10 {
             self.value.to_string_pretty_radix(10, format)
         } else {
@@ -68,24 +114,7 @@ pub struct CalculationResult {
             0
         };
 
-        let equation_variable = if let Some(name) = &self.equation_variable {
-            format!("{} ", name)
-        } else {
-            String::new()
-        };
-
-        let vars_display = if self.equation_variables.len() > 1 {
-            let sorted_vars = {
-                let mut v = self.equation_variables.clone();
-                v.sort();
-                v
-            };
-            format!("({}) ", sorted_vars.join(", "))
-        } else {
-            String::new()
-        };
-
-        if self.is_approximation || decimal_count == 10 {
+        if (self.is_approximation && decimal_count > 0) || decimal_count == 10 {
             format!("{}{}≈ {}", vars_display, equation_variable, value)
         } else {
             format!("{}{}= {}", vars_display, equation_variable, value)
