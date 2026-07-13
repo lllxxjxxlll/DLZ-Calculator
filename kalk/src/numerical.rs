@@ -11,7 +11,6 @@ use crate::kalk_value::KalkValue;
 use crate::lexer::TokenKind;
 use crate::prelude::abs;
 use crate::prelude::exp;
-use crate::prelude::sqrt;
 use crate::test_helpers::f64_to_float_literal;
 
 pub fn derive_func(
