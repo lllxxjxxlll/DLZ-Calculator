@@ -10,10 +10,10 @@ use std::io::Read;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let app = App::new("kalker")
+    let app = App::new("dlz-calculator")
         .author(env!("CARGO_PKG_AUTHORS"))
         .version(env!("CARGO_PKG_VERSION"))
-        .usage("kalker [options] [input]")
+        .usage("dlz-calculator [options] [input]")
         .action(default_action)
         .flag(
             Flag::new("input-file", FlagType::String)

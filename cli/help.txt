@@ -108,7 +108,7 @@ Sum function
     in first argument (eg. n=1). The value of the variable increments by one.
     Example: sum(n=1, 4, 2n) will be the same as 2*1 + 2*2 + 2*3 + 2*4 = 20
     This can for example be used to calculate e: Σ(n=0, 10000, 1/n!) = 2.7182818284590455
-    More precision can be gotten by changing the "--precision" flag. Run `kalker --help` for more info.
+    More precision can be gotten by changing the "--precision" flag. Run `dlz-calculator --help` for more info.
 
     The sum function can also be used to sum vectors, eg. sum(1, 2, 3) or sum(v) or sum[1, 2, 3].
 
@@ -123,7 +123,7 @@ Constants
     phi or ϕ = 1.61803398
 
 Vectors
-    A vector in kalker is an immutable list of values, defined with the syntax (x, y, z)
+    A vector in DLZ Calculator is an immutable list of values, defined with the syntax (x, y, z)
     which may contain an arbitrary amount of items. Generally, when an operation is
     performed on a vector, it is done on each individual item. This means that (2, 4, 8) / 2
     gives the result (1, 2, 4). An exception to this is multiplication with two vectors,
@@ -161,12 +161,12 @@ Matrices
         syntax matrix[[rowIndex, columnIndex]]. Indexes start at 1.
 
 Files
-    Kalker looks for kalker files in the system config directory.
+    DLZ Calculator looks for DLZ files in the system config directory.
 
-    Linux: ~/.config/kalker/
-    macOS: ~/Library/Application Support/kalker/ or ~/Library/Preferences/kalker
-    Windows: %appdata%/kalker/
+    Linux: ~/.config/dlz-calculator/
+    macOS: ~/Library/Application Support/dlz-calculator/ or ~/Library/Preferences/dlz-calculator
+    Windows: %appdata%/dlz-calculator/
 
     If a file with the name default.kalker is found, it will be loaded automatically every time
-    kalker starts. Any other files in this directory with the .kalker extension can be loaded
-    at any time by doing load filename in kalker. Note that the extension should not be included here.
+    DLZ Calculator starts. Any other files in this directory with the .kalker extension can be loaded
+    at any time by doing load filename in DLZ Calculator. Note that the extension should not be included here.

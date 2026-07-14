@@ -44,7 +44,7 @@ pub fn start(
     let mut history_path = None;
     if let Some(cache_path) = dirs::cache_dir() {
         let mut cache_path = cache_path;
-        cache_path.push("kalker");
+        cache_path.push("dlz-calculator");
         if fs::create_dir_all(cache_path.as_path()).is_ok() {
             cache_path.push("history.txt");
             let history = cache_path.into_os_string().into_string().unwrap();
@@ -55,7 +55,7 @@ pub fn start(
 
     // If in tty, print the welcome message
     if atty::is(atty::Stream::Stdin) && atty::is(atty::Stream::Stdout) {
-        println!("kalker");
+        println!("DLZ Calculator");
         println!(
             "{}",
             ansi_term::Color::Fixed(246).paint("Type 'help' for instructions.")

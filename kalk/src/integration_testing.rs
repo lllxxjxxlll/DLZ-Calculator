@@ -11,7 +11,7 @@ mod tests {
         path.push("..");
         path.push("tests");
         path.push(name);
-        path.set_extension("kalker");
+        path.set_extension("dlz");
 
         let mut file_content = String::new();
         File::open(path)

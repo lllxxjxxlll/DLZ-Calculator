@@ -6,10 +6,10 @@ description = "A calculator that supports user-defined functions, variables and 
 edition = "2018"
 keywords = ["math", "calculator", "cli", "command-line"]
 license = "MIT"
-name = "kalker"
+name = "dlz-calculator"
 readme = "../README.md"
-repository = "https://github.com/PaddiM8/kalker"
-version = "2.2.3"
+repository = ""
+version = "1.0.0"
 
 [dependencies]
 ansi_term = "0.12.1"
@@ -31,9 +31,9 @@ winres = "0.1"
 
 [package.metadata.bundle]
 icon = ["../res/icon*"]
-identifier = "net.strct.kalker"
-name = "kalker"
+identifier = "com.dlz.calculator"
+name = "dlz-calculator"
 short_description = "A calculator that supports user-defined functions, variables and units, and can handle fairly ambiguous syntax."
 
-[package.metadata.bundle.bin.kalker]
-name = "kalker"
+[package.metadata.bundle.bin.dlz-calculator]
+name = "dlz-calculator"

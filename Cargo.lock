@@ -112,6 +112,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "dlz-calculator"
+version = "1.0.0"
+dependencies = [
+ "ansi_term",
+ "atty",
+ "dirs",
+ "kalk",
+ "lazy_static",
+ "regex",
+ "rustyline",
+ "seahorse",
+ "winres",
+]
+
+[[package]]
 name = "fs2"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -172,21 +187,6 @@ dependencies = [
  "test-case",
  "wasm-bindgen",
  "wasm-bindgen-test",
-]
-
-[[package]]
-name = "kalker"
-version = "2.2.3"
-dependencies = [
- "ansi_term",
- "atty",
- "dirs",
- "kalk",
- "lazy_static",
- "regex",
- "rustyline",
- "seahorse",
- "winres",
 ]
 
 [[package]]

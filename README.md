@@ -1,103 +1,220 @@
-![](logo.png)
+# DLZ Calculator
 
-Kalker is a calculator program/website that supports user-defined variables, functions, differentiation, and integration. It runs on Windows, macOS, Linux, Android, and in web browsers (with WebAssembly).
+<p align="center">
+  <b>一款高性能科学计算器，支持自定义函数、符号求导、数值积分与方程求解</b>
+</p>
 
-[![Crates.io](https://img.shields.io/crates/v/kalker)](https://crates.io/crates/kalker) ![npm](https://img.shields.io/npm/v/@paddim8/kalk) [![GitHub](https://img.shields.io/github/license/PaddiM8/kalk)](https://github.com/PaddiM8/kalker/blob/master/LICENSE) [![Docs.rs](https://docs.rs/kalk/badge.svg)](https://docs.rs/kalk/latest/kalk/) ![Build status](https://img.shields.io/github/actions/workflow/status/PaddiM8/kalker/build.yml?branch=master&label=build%20%26%20test)
+DLZ Calculator 是基于 [Kalker](https://github.com/PaddiM8/kalker) 二次开发的科学计算器。它使用 Rust 编写，通过 WebAssembly 技术支持在浏览器中运行，具备完整的数学表达式解析与数值计算能力。
 
-[Website - Try it out here!](https://kalker.xyz)
+---
 
-<img src="preview.png" width="750">
+## 目录
 
-# Features
+- [核心架构](#核心架构)
+- [功能特性](#功能特性)
+- [快速开始](#快速开始)
+- [使用示例](#使用示例)
+- [项目结构](#项目结构)
+- [相关库](#相关库)
+- [贡献指南](#贡献指南)
 
-* Operators: `+`, `-`, `*`, `/`, `!`
-* Groups: `()`, `[]`, `⌈ceil⌉`, `⌊floor⌋`
-* [Vectors](https://kalker.xyz/#vectors): (x, y, z, ...)
-* [Matrices](https://kalker.xyz/#matrices): [x, y, z; a, b, c; ...]
-* [Pre-defined functions and constants](https://kalker.xyz/#functions)
-* User-defined functions and variables. `f(x, y) = xy`, `x = 5`
-* Root finding using Newton's method (eg. `x^2 = 64`). Supports multiple roots via smarter initial guesses
-* Quadratic equation solving: equations like `x^2 - 6x + 7 = 0` are solved analytically using the quadratic formula (exact roots, including complex numbers)
-* System of equations: `{x + y = 5; x - y = 1}` solves for multiple variables simultaneously
-* Derivative of functions (derivatives of noisy functions or of higher order can be a bit inaccurate). `f'(2)`, `sin'(-pi)`
-* Integration. `∫(0, pi, sin(x) dx)` or `∫(0, π, sin(x) dx)`, maybe sometimes be slightly off
-* Understands fairly ambiguous syntax. Eg. `2sin50 + 2xy`
-* Syntax highlighting
-* Special-symbol completion on tab. Eg. write `sqrt` and press tab. It will be turned into `√`
-* Sum function: `sum(start, to, expression)` Eg. `sum(1, 3, 2n+1)` is the same as `2*1+1 + 2*2+1 + 2*3+1` = `15`
-* Piecewise functions: `f(x) = { f(x + 1) if x <= 1; x otherwise }`, pressing enter before typing the final `}` will make a new line without submitting
-* Load a file including predefined functions and constants. For example, if you're going to use kalker for physics, you load up your file with physics functions/constants when starting kalker. This is done either using the `-i file` flag or by putting files in a certain directory and then doing `load filename` inside kalker. [More about files here](https://kalker.xyz/#files)
-* Different number bases: Either with a format like `0b1101`, `0o5.3`, `0xff` or a format like `1101_2`. The latter does not support letters, as they would be interpreted as variables
-* Misc: separate expressions by a semicolon to write them on the same line, use the `ans` variable to get the value of the previously calculated expression
+---
 
-# Installation
+## 核心架构
 
-## Package managers
+DLZ Calculator 采用经典的编译前端管道架构处理数学表达式：
 
-### macOS (Homebrew)
-`brew install kalker`
+```
+输入字符串
+    │
+    ▼
+  Lexer（词法分析） → Token 流
+    │
+    ▼
+  Parser（语法分析） → 抽象语法树（AST）
+    │
+    ▼
+  Analysis（语义分析） → 标注后的 AST
+    │
+    ▼
+  Interpreter（解释执行） → 计算结果
+```
 
-### macOS (MacPorts)
-`sudo port install kalker` ([info](https://ports.macports.org/port/kalker/))
+- **Lexer**：手写状态机，支持 Unicode 数学符号识别、科学记数法、多进制前缀（`0b`/`0o`/`0x`）及下标进制标记
+- **Parser**：递归下降解析器，按运算符优先级逐层构建 AST，支持隐式乘法、分段函数和向量推导式
+- **Interpreter**：树遍历求值，使用函数式风格管理复数/向量/矩阵运算，调用前暂存参数/调用后恢复以支持递归
+- **数值方法**：tanh-sinh 双指数求积法（积分）、Newton-Raphson 迭代（单变量/方程组求根）、二次方程求根公式（精确解析解）
 
-### Arch Linux
-`kalker` in the AUR, eg. `yay -S kalker`
+---
 
-### Nix/NixOS
-`kalker` in the [`nixpkgs`](https://search.nixos.org/packages?channel=unstable&show=kalker&from=0&size=50&sort=relevance&type=packages&query=kalker) repository.
-The most up to date version is also available as a [`flake`](https://search.nixos.org/flakes?channel=unstable&show=kalker&from=0&size=50&sort=relevance&type=packages&query=kalker).
+## 功能特性
 
-### NetBSD
-`pkgin install kalker` (from the [`official repositories`](https://pkgsrc.se/math/kalker))
+| 类别 | 说明 | 示例 |
+|------|------|------|
+| 基本运算 | `+` `-` `*` `/` `^` `!` `%` `>>` `<<` | `2^10 = 1024` |
+| 分组符号 | `()` 分组, `[]` 向量/矩阵, `⌈⌉` ceil, `⌊⌋` floor, `\|` abs | `| -5 | = 5` |
+| 向量 | `(a, b, c)` 形式，支持逐元素运算与点积 | `(1,2,3) * 2` |
+| 矩阵 | `[a, b; c, d]` 形式，支持加减法和矩阵乘法 | `[1,2;3,4] * [5;6]` |
+| 预定义函数 | 三角函数、反三角、双曲、指数对数等 | `sin(pi/2)`、`log(e)` |
+| 自定义函数 | 单行定义，支持递归调用 | `f(x) = x^2 + 2x + 1` |
+| 方程求根 | Newton-Raphson 迭代 + 二次方程解析求解 | `x^2 - 4x + 3 = 0` 得到两个根 |
+| 方程组 | 多维 Newton-Raphson 数值求解 | `{x + y = 5; x - y = 1}` |
+| 数值微分 | 中心差分法，支持高阶导数 | `f'(2)`、`sin''(pi)` |
+| 数值积分 | tanh-sinh 双指数求积法 | `∫(0, pi, sin(x) dx)` |
+| 求和/求积 | 循环迭代计算 | `sum(1, 100, n^2)` |
+| 多进制 | 前缀或下标标记 | `0b1101`、`11₂` |
+| 分段函数 | `{ expr if cond; otherwise }` 语法 | `f(x) = { 0 if x<0; x otherwise }` |
+| ans 变量 | 引用上一次计算结果 | `ans * 2` |
+| 模糊语法 | 支持隐式乘法、省略括号 | `2xy` → `2*x*y` |
 
-## Binaries
+> **对数函数说明**：`log(x)` 和 `ln(x)` 均为自然对数；`log10(x)` 为以 10 为底的常用对数；二元形式 `log(x, b)` 表示以 b 为底的对数。
 
-Pre-compiled binaries for Linux, Windows, and macOS (64-bit) are available in the [releases page](https://github.com/PaddiM8/kalker/releases).
+---
 
-## Compiling
+## 快速开始
 
-**Minimum rust version: v1.36.0**. Make sure you have `diffutils` `gcc` `make` and `m4` installed. **If you use windows:** [follow the instructions here](https://docs.rs/gmp-mpfr-sys/1.2.3/gmp_mpfr_sys/index.html#building-on-windows) (don't forget to install `mingw-w64-x86_64-rust` in MSYS2).
+### 前置要求
 
-### Cargo
+- Rust 工具链（最低版本 1.70.0）
+- 如需高精度模式：`diffutils`、`gcc`、`make`、`m4`（Windows 用户需在 MSYS2 中安装 `mingw-w64-x86_64-rust`）
 
-Run `cargo install kalker`
+### 从源码编译
 
-### Manually
+```bash
+git clone https://github.com/lllxxjxxlll/DLZ-Calculator.git
+cd DLZ-calculator
+cargo build --release
+```
 
-1. Go into the `cli` directory.
-2. Run `cargo build --release`
-3. Grab the binary from `targets/release`
+编译完成后，可执行文件位于 `target/release/dlz-calculator.exe`（Windows）或 `target/release/dlz-calculator`（macOS/Linux）。
 
-# Libraries
+### 使用 Cargo 运行
 
-There are currently three different libraries related to kalker.
+```bash
+cargo run --release
+```
 
-* [kalk](https://crates.io/crates/kalk): The Rust crate that powers it all.
-* [@paddim8/kalk](https://www.npmjs.com/package/@paddim8/kalk): JavaScript bindings for `kalk`. This lets you use it in the browser thanks to WebAssembly.
-* [@paddim8/kalk-component](https://www.npmjs.com/package/@paddim8/kalk-component): A web component that runs `@paddim8/kalk`, which let's you use kalk in the browser with a command line-like interface.
+### Web 版
 
-# Syntax
+Web 版通过 WebAssembly 在浏览器中运行：
 
-A complete reference can be found on [the website](https://kalker.xyz).
+```bash
+cd kalk
+wasm-pack build --target web -- --no-default-features
+# 将 pkg/ 目录中的文件复制到 web 服务器的静态目录
+```
 
-# Contributing
+---
 
-## kalk and cli (Rust)
+## 使用示例
 
-After making changes to the kalk library (in `kalk/`), you can easily try them out by going to the root of the project directory, and doing `cargo run`. This will start kalker (cli), with the new changes. If you're using Windows, you will need to [follow the instructions here](https://docs.rs/gmp-mpfr-sys/1.2.3/gmp_mpfr_sys/index.html#building-on-windows), but also make sure to install `mingw-w64-x86_64-rust` in MSYS2.
+```
+> 1 + 2 * 3
+= 7
 
-All Rust code is expected to be formatted with `rustfmt
+> sin(pi/2)
+= 1
 
-## web (Svelte, TypeScript, Sass)
+> f(x) = x^2 + 2x + 1
+> f(3)
+= 16
 
-Run:
-1. `npm install`  
-2. `npm run dev` - this will automatically re-compile the project when changes are made
+> x^2 - 4x + 3 = 0
+x = 3
+x = 1
 
-## mobile (Android)
+> x^2 - 6x + 7 = 0
+x = 4.4142135624
+x = 1.5857864376
 
-Run:  
-1. `npm install`
-2. `npm run build`
-3. `npx cap sync`
-4. Build the project using Android Studio, or Gradle directly.
+> x^2 + 2x + 5 = 0
+x = -1 + 2i
+x = -1 - 2i
+
+> {x + y = 5; x - y = 1}
+(x, y) = 3
+(x, y) = 2
+
+> integral(0, pi, sin(x), dx)
+= 2
+
+> log(e)
+= 1
+
+> log10(100)
+= 2
+
+> 0b1101
+= 13
+
+> [1, 2; 3, 4] * [5, 6; 7, 8]
+[19, 22
+ 43, 50]
+```
+
+---
+
+## 项目结构
+
+```
+kalker/
+├── cli/                 # 命令行界面（基于 rustyline 的交互式 REPL）
+├── kalk/                # 核心计算库
+│   └── src/
+│       ├── ast.rs            # 抽象语法树定义
+│       ├── lexer.rs          # 词法分析器
+│       ├── parser.rs         # 递归下降语法分析器
+│       ├── interpreter.rs    # 树遍历解释器
+│       ├── numerical.rs      # 数值方法（求导/积分/求根/方程组）
+│       ├── kalk_value/       # 核心数值类型（实数/虚数/单位）
+│       ├── prelude/          # 内置函数库与数学常量
+│       ├── symbol_table.rs   # 符号表（变量/函数/单位管理）
+│       ├── analysis.rs       # 语义分析（隐式乘法拆分等）
+│       └── errors.rs         # 错误类型定义
+├── web/                 # Web 前端
+└── tests/               # 集成测试
+```
+
+---
+
+## 相关库
+
+| 名称 | 说明 |
+|------|------|
+| [kalk](https://crates.io/crates/kalk) | Rust crate，核心计算引擎 |
+| [@paddim8/kalk](https://www.npmjs.com/package/@paddim8/kalk) | JavaScript 绑定（WebAssembly） |
+| [@paddim8/kalk-component](https://www.npmjs.com/package/@paddim8/kalk-component) | 命令行风格的 Web 组件 |
+
+---
+
+## 贡献指南
+
+1. 修改核心计算库（`kalk/`）后，在项目根目录运行 `cargo run` 即可使用 CLI 测试改动
+2. 所有 Rust 代码请使用 `rustfmt` 格式化
+3. 提交前请确保 `cargo test` 通过
+
+### Web 版开发
+
+```bash
+cd kalk
+wasm-pack build --target web -- --no-default-features
+# 产物位于 pkg/ 目录，将其复制到 web 项目中即可
+```
+
+---
+
+## 致谢
+
+本项目在原 [Kalker](https://github.com/PaddiM8/kalker) 的基础上进行了以下增强：
+
+- 方程求根支持多个初始猜测，可收敛到不同根
+- 新增二次方程解析求解（含复数根输出）
+- 修复 `log`/`log10`/`ln` 的语义一致性
+- 优化词法分析器以支持 `log10` 等复合标识符
+- 改进数值结果的等于号/约等于号显示逻辑
+
+---
+
+## 许可证
+
+本项目继承原 Kalker 项目的 [MIT 许可证](LICENSE)。
