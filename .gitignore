@@ -5,3 +5,5 @@ cli/Cargo.lock
 cli/test
 .vscode/
 result*
+web/public/kalk/
+kalk/pkg/

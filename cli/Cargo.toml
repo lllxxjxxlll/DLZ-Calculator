@@ -1,5 +1,5 @@
 [package]
-authors = ["PaddiM8"]
+authors = ["DLZ-team"]
 build = "build.rs"
 categories = ["mathematics", "command-line-utilities"]
 description = "A calculator that supports user-defined functions, variables and units, and can handle fairly ambiguous syntax."
@@ -8,7 +8,7 @@ keywords = ["math", "calculator", "cli", "command-line"]
 license = "MIT"
 name = "dlz-calculator"
 readme = "../README.md"
-repository = ""
+repository = "https://github.com/lllxxjxxlll/DLZ-Calculator.git"
 version = "1.0.0"
 
 [dependencies]

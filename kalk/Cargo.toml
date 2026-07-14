@@ -1,11 +1,11 @@
 [package]
-name = "kalk"
+name = "DLZ-team"
 version = "3.2.3"
-authors = ["PaddiM8"]
+authors = ["DLZ-team"]
 edition = "2018"
 readme = "README.md"
 description = "A math evaluator library that supports user-defined functions, variables and units, and can handle fairly ambiguous syntax."
-repository = "https://github.com/PaddiM8/kalker/tree/master/kalk"
+repository = "https://github.com/lllxxjxxlll/DLZ-Calculator.git"
 license = "MIT"
 keywords = ["math", "calculator", "evaluator"]
 categories = ["mathematics", "parser-implementations"]
