@@ -16,7 +16,9 @@ Kalker is a calculator program/website that supports user-defined variables, fun
 * [Matrices](https://kalker.xyz/#matrices): [x, y, z; a, b, c; ...]
 * [Pre-defined functions and constants](https://kalker.xyz/#functions)
 * User-defined functions and variables. `f(x, y) = xy`, `x = 5`
-* Root finding using Newton's method (eg. x^2 = 64). Note: estimation and limited to one root
+* Root finding using Newton's method (eg. `x^2 = 64`). Supports multiple roots via smarter initial guesses
+* Quadratic equation solving: equations like `x^2 - 6x + 7 = 0` are solved analytically using the quadratic formula (exact roots, including complex numbers)
+* System of equations: `{x + y = 5; x - y = 1}` solves for multiple variables simultaneously
 * Derivative of functions (derivatives of noisy functions or of higher order can be a bit inaccurate). `f'(2)`, `sin'(-pi)`
 * Integration. `∫(0, pi, sin(x) dx)` or `∫(0, π, sin(x) dx)`, maybe sometimes be slightly off
 * Understands fairly ambiguous syntax. Eg. `2sin50 + 2xy`
